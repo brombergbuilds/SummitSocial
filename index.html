@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arizona Trail Run Planner — South Mountain & Show Low</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --easy:#2e7d32; --mod:#ef6c00; --hard:#c62828;
+    --bg:#14181d; --panel:#1e242b; --card:#262e37; --text:#e8ebee; --muted:#9aa6b1;
+    --accent:#f0a843;
+  }
+  body.showlow{ --bg:#141a16; --panel:#1c241f; --card:#253029; --muted:#9cab9f; --accent:#7cb342; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text)}
+  #app{display:flex;height:100%}
+  #sidebar{width:390px;min-width:330px;background:var(--panel);display:flex;flex-direction:column;overflow:hidden;border-right:1px solid #000}
+  #mapwrap{flex:1;position:relative;display:flex}
+  #map{flex:1;background:#0d0f12}
+  #profile{position:absolute;left:0;right:0;bottom:0;z-index:1200;display:none;background:rgba(18,22,27,.93);border-top:1px solid #000;padding:7px 14px 9px}
+  #profHead{display:flex;align-items:center;gap:10px;font-size:12px;margin-bottom:4px}
+  #profTitle b{color:var(--accent)}
+  #profClose{margin-left:auto;background:none;border:none;color:var(--muted);font-size:17px;cursor:pointer;line-height:1}
+  #profSvg{width:100%;height:110px;display:block}
+  .gpxbtn{background:var(--accent);color:#14181d;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;margin-top:8px}
+  .gpxbtn:hover{filter:brightness(1.1)}
+  .gpxnote{font-size:10.5px;color:var(--muted);margin-left:8px}
+  header{padding:12px 16px 8px}
+  header h1{font-size:17px;letter-spacing:.3px}
+  header p{font-size:11.5px;color:var(--muted);margin-top:3px}
+  #regions{display:flex;gap:8px;padding:8px 16px 10px}
+  .rbtn{flex:1;border:1px solid #46525f;background:transparent;color:var(--muted);padding:8px 10px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer}
+  .rbtn.active{background:var(--accent);border-color:var(--accent);color:#14181d}
+  #filters{display:flex;gap:6px;padding:0 16px 10px;flex-wrap:wrap}
+  .fbtn{border:1px solid #3a4450;background:transparent;color:var(--muted);padding:5px 12px;border-radius:14px;font-size:12px;cursor:pointer}
+  .fbtn.active{color:#fff;border-color:transparent}
+  .fbtn.active[data-f="all"]{background:#3a4450}
+  .fbtn.active[data-f="Easy"]{background:var(--easy)}
+  .fbtn.active[data-f="Moderate"]{background:var(--mod)}
+  .fbtn.active[data-f="Hard"]{background:var(--hard)}
+  #paceRow{display:flex;align-items:center;gap:8px;padding:0 16px 10px;font-size:12px;color:var(--muted)}
+  #paceRow input{width:56px;background:var(--card);border:1px solid #3a4450;color:var(--text);border-radius:6px;padding:4px 6px;font-size:12px}
+  #cards{flex:1;overflow-y:auto;padding:0 12px 12px}
+  .card{background:var(--card);border-radius:10px;padding:12px 14px;margin-bottom:10px;cursor:pointer;border:1px solid transparent;transition:border-color .15s}
+  .card:hover{border-color:#46525f}
+  .card.selected{border-color:var(--accent)}
+  .card h3{font-size:14px;display:flex;align-items:center;gap:8px}
+  .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .stats{display:flex;gap:11px;margin-top:6px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .stats b{color:var(--text);font-weight:600}
+  .badge{font-size:10px;padding:2px 7px;border-radius:9px;color:#fff;margin-left:auto;flex-shrink:0}
+  .detail{display:none;margin-top:9px;font-size:12.5px;line-height:1.5;color:#c6ced6}
+  .card.selected .detail{display:block}
+  .detail .row{margin-top:6px}
+  .detail .lbl{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  #status{padding:8px 16px;font-size:11px;color:var(--muted);border-top:1px solid #2c343d}
+  #safety{font-size:11.5px;line-height:1.45;padding:9px 16px;border-top:1px solid #2c343d;background:#3a2c20;color:#f3c98b}
+  body.showlow #safety{background:#33401f;color:#d6e8a8}
+  .leaflet-container{font:inherit}
+  .th-icon{background:var(--accent);border:2px solid #fff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,.6)}
+  .poi-icon{background:#7e57c2;border:2px solid #fff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,.6)}
+  .home-icon{background:#fdd835;border:3px solid #5d4037;border-radius:50%;box-shadow:0 0 6px rgba(0,0,0,.8)}
+  .leaflet-tooltip{font-size:11px}
+  @media (max-width:760px){
+    #app{flex-direction:column}
+    #sidebar{width:100%;min-width:0;height:50%;order:2}
+    #map{height:50%}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <header>
+      <h1>Arizona Trail Run Planner</h1>
+      <p id="subtitle"></p>
+    </header>
+    <div id="regions">
+      <button class="rbtn active" data-r="south">🌵 South Mountain</button>
+      <button class="rbtn" data-r="showlow">🌲 Show Low</button>
+    </div>
+    <div id="filters">
+      <button class="fbtn active" data-f="all">All</button>
+      <button class="fbtn" data-f="Easy">Easy</button>
+      <button class="fbtn" data-f="Moderate">Moderate</button>
+      <button class="fbtn" data-f="Hard">Hard / Long</button>
+    </div>
+    <div id="paceRow">
+      Flat trail pace: <input id="pace" type="number" value="11" min="5" max="20" step="0.5"> min/mi
+      <span id="paceNote" style="font-size:10.5px"></span>
+    </div>
+    <div id="cards"></div>
+    <div id="safety"></div>
+    <div id="status">Loading trail lines from OpenStreetMap…</div>
+  </div>
+  <div id="mapwrap">
+    <div id="map"></div>
+    <div id="profile">
+      <div id="profHead"><span id="profTitle"></span><button id="profClose" title="Close">×</button></div>
+      <svg id="profSvg" viewBox="0 0 860 110" preserveAspectRatio="none"></svg>
+    </div>
+  </div>
+</div>
+
+<script>
+// =================================================================
+// DATA — stats: City of Phoenix, TRACKS White Mountains, AllTrails,
+// US Forest Service, torreon.com trail guide
+// =================================================================
+const REGIONS = {
+// ---------------- SOUTH MOUNTAIN (Phoenix) ----------------
+south: {
+ label:"South Mountain",
+ subtitle:"South Mountain Park/Preserve, Phoenix · 100+ mi of trail · click a run to see it on the map",
+ paceNote:"(+1 min per 100 ft of climb)",
+ safety:"<b>Heat safety:</b> No water on any trail — carry more than you think. Summer: start at first light (park opens 5 AM); the city restricts hiking on Excessive Heat Warning days. Distances/elevation from City of Phoenix & AllTrails; GPS lines from OpenStreetMap.",
+ center:[33.343,-112.05], zoom:13,
+ bbox:"33.288,-112.170,33.395,-111.960", cacheKey:"smtrails",
+ home:null,
+ runs:[
+  {id:"dc", name:"Desert Classic Cruiser", diff:"Easy", dist:"6–18 mi", distLo:6, distHi:18, gain:"300–1,100 ft", gainN:700,
+   type:"Out & back", th:"Pima Canyon TH", drive:null, match:["desert classic"], focus:[33.335,-112.03], zoom:13,
+   desc:"The most runnable trail in the park: 9.0 mi of smooth, rolling singletrack along the south base of the mountain (official elevation change only 270 ft; cumulative rollers add up on the full length). Turn around whenever you like — great for tempo runs and marathon-pace long runs.",
+   route:"Pima Canyon TH → Desert Classic west as far as you like → return. Bail-outs at Beverly Canyon and Warpaint."},
+  {id:"pima", name:"Pima Canyon Loop", diff:"Easy", dist:"3.3 mi", distLo:3.3, distHi:3.3, gain:"~250 ft", gainN:250,
+   type:"Loop", th:"Pima Canyon TH", drive:null, match:["pima wash","pima loop","pima east","pima west"], focus:[33.352,-112.018], zoom:14,
+   desc:"Gentle wash-bottom and foothill loop — ideal warm-up, recovery day, or add-on to a Desert Classic run. Mostly soft, sandy-to-buffed tread.",
+   route:"Pima Canyon TH → Pima Wash Trail → Pima West Loop → Pima East Loop → back to TH."},
+  {id:"bajada", name:"Bajada Foothills Loop", diff:"Easy", dist:"~5 mi", distLo:5, distHi:5, gain:"~450 ft", gainN:450,
+   type:"Loop", th:"Five Tables / Main Entrance", drive:null, match:["bajada","las lomitas","ranger"], focus:[33.341,-112.095], zoom:14,
+   desc:"Quiet, gently rolling loop through the central foothills on the Bajada, Las Lomitas and lower Ranger trails. Stays fairly level — good easy-day mileage away from the crowds.",
+   route:"Five Tables TH → Ranger Trail (lower) → Bajada Trail west → Las Lomitas back to start."},
+  {id:"mormon", name:"Mormon – Hidden Valley Classic", diff:"Moderate", dist:"5.0 mi", distLo:5, distHi:5, gain:"~900 ft", gainN:900,
+   type:"Loop", th:"Mormon TH (24th St)", drive:null, match:["mormon","hidden valley"], focus:[33.355,-112.030], zoom:14,
+   desc:"The park's signature loop: climb Mormon Trail (1.1 mi, 720 ft), traverse a stretch of the National Trail, then thread Hidden Valley — squeeze through Fat Man's Pass, run the sandy valley floor, pop out the natural rock tunnel — and descend Mormon Loop. Petroglyphs en route.",
+   route:"Mormon TH → Mormon Trail up → National east → Hidden Valley (Fat Man's Pass + tunnel) → National → Mormon Loop down → TH."},
+  {id:"javelina", name:"Javelina – Ridgeline Loop", diff:"Moderate", dist:"3.6 mi", distLo:3.6, distHi:3.6, gain:"~590 ft", gainN:590,
+   type:"Loop", th:"Beverly Canyon TH", drive:null, match:["javelina","ridgeline","beverly"], focus:[33.352,-112.027], zoom:14,
+   desc:"AllTrails' top-rated running loop in the preserve (4.7★). Punchy climbs on Javelina Canyon (465 ft) with a fun, flowy ridgeline return. Great lunch-hour effort.",
+   route:"Beverly Canyon TH → Javelina Canyon Trail → Ridgeline Trail → Beverly Canyon Trail back."},
+  {id:"holbert", name:"Holbert to Dobbins Lookout", diff:"Moderate", dist:"~5 mi", distLo:5, distHi:5, gain:"~1,100 ft", gainN:1100,
+   type:"Out & back", th:"Holbert TH", drive:null, match:["holbert"], focus:[33.346,-112.065], zoom:14,
+   desc:"Steady 2.5-mi climb (1,100 ft) to Dobbins Lookout — the best city view in Phoenix. Rocky in places; a classic hill-repeat or sunrise summit run. (On the city's restricted list during Excessive Heat Warnings.)",
+   route:"Holbert TH → Holbert Trail → spur to Dobbins Lookout → return the same way."},
+  {id:"kiwanis", name:"Kiwanis – Telegraph Pass", diff:"Moderate", dist:"2.8 mi", distLo:2.8, distHi:2.8, gain:"~600 ft", gainN:600,
+   type:"Out & back", th:"Kiwanis TH", drive:null, match:["kiwanis","telegraph"], focus:[33.335,-112.072], zoom:14,
+   desc:"Short, honest climb up a canyon to the Telegraph Pass lookout. Good for hill intervals; link over the pass to Desert Classic for a bigger day.",
+   route:"Kiwanis TH → Kiwanis Trail (1.0 mi, 480 ft) → Telegraph Pass lookout → return (or descend Telegraph Pass Trail to Desert Classic)."},
+  {id:"national", name:"National Trail Traverse", diff:"Hard", dist:"14.3 mi pt-to-pt", distLo:14.3, distHi:14.3, gain:"~2,300–2,500 ft", gainN:2400,
+   type:"Point-to-point", th:"Pima Canyon TH → San Juan", drive:null, match:["national"], focus:[33.34,-112.06], zoom:12,
+   desc:"THE South Mountain long run — the full ridgeline end-to-end (AllTrails: 15.4 mi / 2,273 ft incl. access; HikeArizona: ~14 mi / ~2,500 ft cumulative). Rocky, technical, exposed, spectacular. Arrange a shuttle at San Juan, or double it for a 28-mi ultra day.",
+   route:"Pima Canyon TH → Pima Wash → National Trail west over Buena Vista, the TV towers and Telegraph Pass → Goat Hill → San Juan Lookout."},
+  {id:"telecorona", name:"Telegraph – National – Corona Loop", diff:"Hard", dist:"~14 mi", distLo:14, distHi:14, gain:"~1,900 ft", gainN:1900,
+   type:"Loop", th:"Pima Canyon TH", drive:null, match:["desert classic","telegraph","corona","national"], focus:[33.335,-112.04], zoom:13,
+   desc:"Big loop with no shuttle: cruise Desert Classic west, climb Telegraph Pass (steep, part-paved), run the National Trail ridgeline east past Buena Vista Lookout, then drop the rough, fast Corona de Loma (880 ft) back to Desert Classic.",
+   route:"Pima Canyon TH → Desert Classic west → Telegraph Pass up → National east → Corona de Loma down → Desert Classic east → TH."},
+  {id:"alta", name:"Alta Ridge Loop", diff:"Hard", dist:"~9.5 mi", distLo:9.5, distHi:9.5, gain:"~1,600 ft", gainN:1600,
+   type:"Loop", th:"San Juan Rd Gate", drive:null, match:["alta","bajada","max delta"], focus:[33.337,-112.105], zoom:13,
+   desc:"The quiet west end. Alta Trail (4.8 mi, 1,100 ft — rated Difficult) climbs steep 1930s CCC switchbacks to the crest of the Ma Ha Tuak ridge with the best running-on-a-ridgeline feel in the park; return on the flat Bajada/Max Delta trails.",
+   route:"San Juan gate → 0.5 mi on road → Alta Trail over the ridge → descend east end → Bajada / Max Delta back west to the gate."},
+  {id:"ultra", name:"Around-the-Mountain Ultra", diff:"Hard", dist:"~22 mi", distLo:22, distHi:22, gain:"~3,400 ft", gainN:3400,
+   type:"Loop", th:"Pima Canyon TH", drive:null, match:["national","desert classic"], focus:[33.34,-112.06], zoom:12,
+   desc:"The full tour: National Trail end-to-end westbound, then return the length of the park on Desert Classic. Ultra training staple — ridgeline tech first, runnable rollers home. Cache water at San Juan or the main entrance.",
+   route:"Pima Canyon TH → National west to San Juan → connect via Bajada/Alta-side trails or road → Desert Classic east all the way back → TH."}
+ ],
+ trailheads:[
+  {n:"Pima Canyon Trailhead", c:[33.3547,-112.0125], note:"Main east entrance · restrooms, water at TH · Desert Classic, National, Pima loops"},
+  {n:"Mormon Trailhead (24th St)", c:[33.3664,-112.0307], note:"Mormon / Hidden Valley loop · small lot, fills early on weekends"},
+  {n:"Beverly Canyon Trailhead*", c:[33.3528,-112.0260], note:"Javelina–Ridgeline loop"},
+  {n:"Holbert Trailhead", c:[33.3516,-112.0700], note:"Holbert Trail to Dobbins Lookout"},
+  {n:"Kiwanis Trailhead", c:[33.3407,-112.0761], note:"Kiwanis Trail to Telegraph Pass"},
+  {n:"Five Tables Trailhead", c:[33.3414,-112.0861], note:"Ranger / Bajada / Las Lomitas"},
+  {n:"Park Main Entrance", c:[33.3467,-112.0847], note:"10919 S Central Ave · Education Center, water"},
+  {n:"San Juan Rd Gate", c:[33.3337,-112.0991], note:"West end · Alta Trail, National Trail west terminus area"},
+  {n:"Desert Foothills Trailhead", c:[33.3177,-112.0664], note:"Telegraph Pass Trail from the south (Ahwatukee)"},
+  {n:"Warpaint Access Trailhead", c:[33.3285,-112.0115], note:"Desert Classic mid-point access · Corona de Loma"},
+  {n:"19th Ave Trailhead*", c:[33.3756,-112.1010], note:"Ma Ha Tauk / Max Delta (northwest)"}
+ ],
+ pois:[
+  {n:"Dobbins Lookout (2,330 ft)*", c:[33.3399,-112.0594]},
+  {n:"Buena Vista Lookout*", c:[33.3344,-112.0427]},
+  {n:"Telegraph Pass*", c:[33.3300,-112.0680]},
+  {n:"Fat Man's Pass / Hidden Valley*", c:[33.3370,-112.0260]},
+  {n:"San Juan Lookout*", c:[33.3290,-112.1170]}
+ ]
+},
+// ---------------- SHOW LOW / WHITE MOUNTAINS ----------------
+showlow: {
+ label:"Show Low",
+ subtitle:"White Mountains Trail System · home base: 4061 W Redtwig Ln, Torreon (yellow pin) · ~7,000 ft",
+ paceNote:"(+1 min/100 ft climb; expect ~30–60 s/mi slower at 7,000 ft)",
+ safety:"<b>Mountain notes:</b> You're at ~6,400–7,600 ft — pace will feel harder than Phoenix. Summer monsoon: lightning builds most afternoons Jul–Sep, run early. Trails are shared with mountain bikes & horses; watch for elk. Carry water — none on trail. Stats from TRACKS, AllTrails & Torreon's trail guide.",
+ center:[34.20,-109.97], zoom:11,
+ bbox:"34.030,-110.180,34.320,-109.740", cacheKey:"sltrails",
+ home:{n:"Home base", address:"4061 W Redtwig Ln, Show Low, AZ 85901", c:[34.2240,-110.0600], note:"4061 W Redtwig Ln, Torreon (Rendezvous), Show Low"},
+ runs:[
+  {id:"bluff", name:"Show Low Bluff Trail", diff:"Easy", dist:"1–4 mi", distLo:1, distHi:4, gain:"minimal", gainN:80,
+   type:"Out & back", th:"N White Mountain Rd", drive:"5.2 mi", match:["bluff"], focus:[34.2455,-110.0530], zoom:14,
+   desc:"Creekside city trail along Show Low Creek — soft tread, shade, off-leash dog areas, wildflowers in season. The closest thing to an easy recovery jog in town; link segments for up to ~4 miles.",
+   route:"Trailhead off N White Mountain Rd → follow Show Low Creek as far as you like → return."},
+  {id:"fool", name:"Fool Hollow Lake Loop", diff:"Easy", dist:"3.2 mi", distLo:3.2, distHi:3.2, gain:"~100 ft", gainN:100,
+   type:"Out & back", th:"Fool Hollow Lake Rec Area", drive:"3 mi", match:["fool hollow"], focus:[34.2740,-110.0670], zoom:14,
+   desc:"Flat, scenic shoreline running at the state park — part paved, part gravel, waterfowl everywhere. $7 day pass. Perfect shake-out or family jog.",
+   route:"Park entrance → lakeshore trail around the coves → return the same way."},
+  {id:"bvshort", name:"Buena Vista Short Loop", diff:"Easy", dist:"3.0 mi", distLo:3, distHi:3, gain:"~220 ft", gainN:220,
+   type:"Loop", th:"Buena Vista TH (off US-60/Rim Rd)", drive:"3.6 mi", match:["buena vista"], focus:[34.2100,-110.0400], zoom:13,
+   desc:"The inner loop of Buena Vista #637 — rolling ponderosa singletrack 5 minutes from town. Open year-round; well marked main trail (crossover junctions can confuse, keep the map handy).",
+   route:"Buena Vista TH → short-loop crossover → back to TH. Extend onto the full loop any time."},
+  {id:"rim", name:"Mogollon Rim Interpretive Trail", diff:"Easy", dist:"0.8 mi", distLo:0.8, distHi:0.8, gain:"minimal", gainN:30,
+   type:"Out & back", th:"Off AZ-260 / White Mountain Rd", drive:"8.7 mi", match:["mogollon rim"], focus:[34.1910,-110.0050], zoom:14,
+   desc:"Paved mini-trail with huge views off the edge of the Mogollon Rim. Not a workout — but a great cooldown leg-stretcher with a view.",
+   route:"Overlook parking → paved path along the rim → return."},
+  {id:"cclub", name:"Country Club + Pat Mullen Loop", diff:"Easy", dist:"3.5 mi", distLo:3.5, distHi:3.5, gain:"~200 ft", gainN:200,
+   type:"Loop", th:"FR 185 (Bucksprings Rd)", drive:"19 mi", match:["country club","pat mullen"], focus:[34.1300,-109.9300], zoom:13,
+   desc:"Mellow loop through ponderosa, juniper and oak — 200 ft of climb in the first half, then cruisey downhill. Optional spur to the top of Pat Mullen Mountain for extra credit.",
+   route:"FR 185 TH → Country Club loop (clockwise) → optional Pat Mullen summit spur → close the loop."},
+  {id:"bvfull", name:"Buena Vista Full Loop", diff:"Moderate", dist:"10.3 mi", distLo:10.3, distHi:10.3, gain:"~650 ft", gainN:650,
+   type:"Loop", th:"Buena Vista TH (off US-60/Rim Rd)", drive:"3.6 mi", match:["buena vista"], focus:[34.2000,-110.0350], zoom:12,
+   desc:"Your go-to long run from Torreon — 10 minutes away. Rolling hills through pine forest with views to Mt. Baldy and (on clear days) the San Francisco Peaks. Sandy/rocky back half; can be muddy in spring. Download the map — it crosses ATV routes.",
+   route:"Buena Vista TH → full #637 loop (either direction) → TH. Combine with the short loop for bonus miles."},
+  {id:"timber", name:"Timber Mesa Trail", diff:"Moderate", dist:"7.6 mi", distLo:7.6, distHi:7.6, gain:"~580 ft", gainN:580,
+   type:"Loop", th:"Porter Mountain Rd (FR 45)", drive:"12 mi", match:["timber mesa"], focus:[34.1750,-109.9550], zoom:13,
+   desc:"Scenic, well-marked mesa loop — a bit rocky in places but honest, runnable terrain with one good climb onto the mesa top. Popular April–September.",
+   route:"FR 45 TH (2.2 mi up Porter Mountain Rd, left at the cattle guard) → loop the mesa → TH."},
+  {id:"pano", name:"Panorama Trail", diff:"Moderate", dist:"8.9 mi", distLo:8.9, distHi:8.9, gain:"~700 ft", gainN:700,
+   type:"Loop", th:"Porter Mountain Rd, Lakeside", drive:"14.6 mi", match:["panorama"], focus:[34.1900,-109.9300], zoom:13,
+   desc:"Forest-and-meadow loop with a big payoff viewpoint at halfway (San Francisco Peaks visible 100+ miles away on clear days). Generally flat and fast; deer and turkey tracks everywhere. Muddy when wet.",
+   route:"Porter Mountain Rd TH → loop to the panorama outlook → fast back half → TH."},
+  {id:"pioneers", name:"Land of the Pioneers", diff:"Moderate", dist:"~8.5 mi", distLo:8.5, distHi:8.5, gain:"~600 ft", gainN:600,
+   type:"Loop", th:"Porter Mountain area", drive:"~14 mi", match:["pioneers"], focus:[34.2000,-109.9200], zoom:13,
+   desc:"One of the original 1980s TRACKS trails — an intermediate loop sampling the region's full ecology, from pine stands to open juniper country. Quieter than the marquee loops.",
+   route:"TH off the Porter Mountain network → signed loop → return. Check the TRACKS map for current access."},
+  {id:"caballos", name:"Los Caballos Loop", diff:"Hard", dist:"14.6 mi", distLo:14.6, distHi:14.6, gain:"~1,000 ft", gainN:1000,
+   type:"Loop", th:"Joe Tank Rd (off AZ-260)", drive:"3.4 mi", match:["caballos"], focus:[34.2200,-110.0900], zoom:12,
+   desc:"The closest big loop to Torreon — under 10 minutes away. A full half-day tour of rolling forest where wild mustangs are regularly spotted (hence the name). Bring real fuel and water; bail-outs are limited.",
+   route:"Joe Tank Rd TH → Los Caballos #638 full loop → TH."},
+  {id:"burros", name:"Los Burros Trail", diff:"Hard", dist:"13.6 mi", distLo:13.6, distHi:13.6, gain:"~1,290 ft", gainN:1290,
+   type:"Loop", th:"Los Burros Campground (FR 20, McNary)", drive:"29 mi", match:["burros"], focus:[34.0870,-109.7930], zoom:12,
+   desc:"Destination long run wrapping around Wishbone Mountain — mellow climbs, great scenery, a few challenging rocky stretches. The highest and coolest (literally) of the long loops; worth the 40-minute drive.",
+   route:"Los Burros Campground TH → loop around Wishbone Mountain → TH."},
+  {id:"blueridge", name:"Blue Ridge Loop", diff:"Hard", dist:"9.1 mi", distLo:9.1, distHi:9.1, gain:"~1,050 ft", gainN:1050,
+   type:"Loop", th:"Branding Iron Loop, Pinetop", drive:"13 mi", match:["blue ridge","billy creek"], focus:[34.1480,-109.9400], zoom:13,
+   desc:"The hilliest run on this list: dense woods, a creekside stretch along Billy Creek, a real climb to the top of Blue Ridge Mountain and a long switchback descent. Rocky — bikers call it a hiking trail, which makes it a great running trail.",
+   route:"Branding Iron Loop TH → climb Blue Ridge Mountain → switchback descent along Billy Creek → close the loop."}
+ ],
+ trailheads:[
+  {n:"Buena Vista Trailhead*", c:[34.2100,-110.0400], note:"Buena Vista #637 short + full loops · US-60 to Rim Rd, ~5 min from City Park"},
+  {n:"Los Caballos Trailhead*", c:[34.2200,-110.0900], note:"Los Caballos #638 14.6-mi loop · Joe Tank Rd off AZ-260 · 3.4 mi from Torreon"},
+  {n:"Show Low Bluff TH*", c:[34.2455,-110.0530], note:"Creekside city trail · N White Mountain Rd"},
+  {n:"Fool Hollow Lake Rec Area", c:[34.2740,-110.0670], note:"Lake loop · $7 day pass · restrooms & water"},
+  {n:"Mogollon Rim Overlook*", c:[34.1910,-110.0050], note:"Paved interpretive trail, big rim views · off AZ-260"},
+  {n:"Timber Mesa Trailhead*", c:[34.1750,-109.9550], note:"FR 45 (Porter Mountain Rd), 2.2 mi, left at cattle guard"},
+  {n:"Panorama Trailhead*", c:[34.1900,-109.9300], note:"Porter Mountain Rd, Lakeside"},
+  {n:"Springs / Country Club THs*", c:[34.1320,-109.9350], note:"Bucksprings Rd → FR 182/185 · Springs, Country Club & Pat Mullen trails"},
+  {n:"Blue Ridge Trailhead*", c:[34.1480,-109.9400], note:"Branding Iron Loop, Pinetop · Blue Ridge #107"},
+  {n:"Los Burros Trailhead*", c:[34.0870,-109.7930], note:"FR 224 → FR 20, Los Burros Campground, McNary"}
+ ],
+ pois:[]
+}
+};
+
+const DIFF_COLOR = {Easy:"#2e7d32", Moderate:"#ef6c00", Hard:"#c62828"};
+
+// =================================================================
+// MAP
+// =================================================================
+const map = L.map('map',{zoomControl:true});
+const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'© OpenStreetMap, SRTM | © OpenTopoMap (CC-BY-SA)'});
+const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Esri World Imagery'});
+const streets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'});
+topo.addTo(map);
+
+const homeLayer = L.layerGroup().addTo(map);
+const thLayer = L.layerGroup().addTo(map);
+const poiLayer = L.layerGroup().addTo(map);
+const baseTrailLayer = L.layerGroup().addTo(map);
+const hlLayer = L.layerGroup().addTo(map);
+
+L.control.layers(
+ {"Topo (contours)":topo,"Satellite":sat,"Streets":streets},
+ {"Trailheads":thLayer,"Landmarks":poiLayer,"All trails":baseTrailLayer},
+ {collapsed:true}
+).addTo(map);
+
+// =================================================================
+// STATE & REGION SWITCHING
+// =================================================================
+let regionKey = 'south';
+let selected = null, filter = 'all';
+const trailCache = {};   // regionKey -> ways
+const cardsEl = document.getElementById('cards');
+const norm = s => (s||"").toLowerCase().replace(/[^a-z ]/g,"").replace(/\btrail\b/g,"").trim();
+
+function R(){ return REGIONS[regionKey]; }
+
+function setRegion(key){
+  regionKey = key; selected = null; filter = 'all';
+  document.body.classList.toggle('showlow', key==='showlow');
+  document.querySelectorAll('.rbtn').forEach(b=>b.classList.toggle('active', b.dataset.r===key));
+  document.querySelectorAll('.fbtn').forEach(x=>x.classList.remove('active'));
+  document.querySelector('.fbtn[data-f="all"]').classList.add('active');
+  document.getElementById('subtitle').textContent = R().subtitle;
+  document.getElementById('paceNote').textContent = R().paceNote;
+  document.getElementById('safety').innerHTML = R().safety;
+
+  homeLayer.clearLayers(); thLayer.clearLayers(); poiLayer.clearLayers();
+  baseTrailLayer.clearLayers(); hlLayer.clearLayers();
+  if(typeof hideProfile==='function') hideProfile();
+
+  if(R().home){
+    const h = R().home;
+    const homeMarker = L.marker(h.c,{icon:L.divIcon({className:'home-icon',iconSize:[18,18]}),zIndexOffset:1000})
+     .bindPopup('<b>🏡 '+h.n+'</b><br>'+h.note).bindTooltip('Home base').addTo(homeLayer);
+    geocodeHome(h, homeMarker);
+  }
+  R().trailheads.forEach(t=>{
+    L.marker(t.c,{icon:L.divIcon({className:'th-icon',iconSize:[14,14]})})
+     .bindPopup('<b>'+t.n+'</b><br>'+t.note).bindTooltip(t.n).addTo(thLayer);
+  });
+  R().pois.forEach(p=>{
+    L.marker(p.c,{icon:L.divIcon({className:'poi-icon',iconSize:[11,11]})})
+     .bindTooltip(p.n).addTo(poiLayer);
+  });
+
+  map.setView(R().center, R().zoom);
+  render();
+  loadTrails();
+}
+
+// =================================================================
+// HOME-BASE GEOCODING (Nominatim, cached; falls back to Torreon CC)
+// =================================================================
+async function geocodeHome(h, marker){
+  if(!h.address) return;
+  const ck = 'homegeo:'+h.address;
+  try{
+    const cached = JSON.parse(localStorage.getItem(ck)||'null');
+    if(cached){ marker.setLatLng(cached); return; }
+  }catch(e){}
+  const urls = [
+    'https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(h.address),
+    'https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent('W Redtwig Ln, Show Low, AZ'),
+    'https://photon.komoot.io/api/?limit=1&q='+encodeURIComponent(h.address)
+  ];
+  for(const u of urls){
+    try{
+      const r = await fetch(u);
+      if(!r.ok) continue;
+      const j = await r.json();
+      let ll = null;
+      if(Array.isArray(j) && j[0] && j[0].lat) ll = [parseFloat(j[0].lat), parseFloat(j[0].lon)];
+      else if(j.features && j.features[0]) ll = [j.features[0].geometry.coordinates[1], j.features[0].geometry.coordinates[0]];
+      if(ll && Math.abs(ll[0]-34.22)<0.25 && Math.abs(ll[1]+110.06)<0.25){ // sanity: must be near Show Low
+        marker.setLatLng(ll);
+        try{ localStorage.setItem(ck, JSON.stringify(ll)); }catch(e){}
+        return;
+      }
+    }catch(e){ /* try next */ }
+  }
+  // all failed → marker stays at Torreon clubhouse fallback
+}
+
+// =================================================================
+// TRAIL GEOMETRY (OpenStreetMap Overpass, cached per region)
+// =================================================================
+const OVERPASS = [
+ "https://overpass-api.de/api/interpreter",
+ "https://overpass.kumi.systems/api/interpreter",
+ "https://overpass.private.coffee/api/interpreter",
+ "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
+];
+
+async function loadTrails(){
+  const key = regionKey, reg = R();
+  const st = document.getElementById('status');
+  if(trailCache[key]){ drawBase(); st.textContent='Trail lines: OpenStreetMap · '+trailCache[key].length+' segments'; return; }
+  try{
+    const cached = JSON.parse(localStorage.getItem(reg.cacheKey)||'null');
+    if(cached && Date.now()-cached.t < 7*864e5 && cached.ways && cached.ways.length){
+      trailCache[key]=cached.ways;
+      if(regionKey===key){ drawBase(); st.textContent='Trail lines: OpenStreetMap (cached) · '+cached.ways.length+' segments'; }
+      return;
+    }
+  }catch(e){}
+  const query = '[out:json][timeout:90];way["highway"~"^(path|footway|track)$"]["name"]('+reg.bbox+');out geom;';
+  for(const url of OVERPASS){
+    try{
+      st.textContent = 'Loading '+reg.label+' trail lines from OpenStreetMap…';
+      const r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(query)});
+      if(!r.ok) throw new Error(r.status);
+      const j = await r.json();
+      const ways = (j.elements||[]).filter(e=>e.type==='way'&&e.geometry).map(e=>({
+        name:e.tags.name, norm:norm(e.tags.name),
+        latlngs:e.geometry.map(g=>[g.lat,g.lon])
+      }));
+      if(!ways.length) throw new Error('empty');
+      trailCache[key]=ways;
+      try{ localStorage.setItem(reg.cacheKey,JSON.stringify({t:Date.now(),ways:ways})); }catch(e){}
+      if(regionKey===key){ drawBase(); st.textContent='Trail lines: OpenStreetMap · '+ways.length+' segments loaded'; }
+      return;
+    }catch(e){ /* try next mirror */ }
+  }
+  if(regionKey===key) st.innerHTML = '⚠️ Couldn\'t reach OpenStreetMap (offline?). The <b>Topo basemap still shows the trails</b> — run highlighting is unavailable until you reload with internet.';
+}
+
+function drawBase(){
+  baseTrailLayer.clearLayers();
+  (trailCache[regionKey]||[]).forEach(w=>{
+    L.polyline(w.latlngs,{color:'#8a949e',weight:2,opacity:.75})
+     .bindTooltip(w.name,{sticky:true}).addTo(baseTrailLayer);
+  });
+}
+
+// =================================================================
+// GEOMETRY HELPERS (stitch OSM segments into one continuous path)
+// =================================================================
+function matchedWays(r){
+  return (trailCache[regionKey]||[]).filter(w=>r.match.some(m=>w.norm.includes(m)));
+}
+function dist2(a,b){const dx=(a[1]-b[1])*Math.cos((a[0]+b[0])*Math.PI/360),dy=a[0]-b[0];return dx*dx+dy*dy}
+function orderWays(ways){
+  const segs=ways.map(w=>w.latlngs.slice()).filter(s=>s.length>1);
+  if(!segs.length) return [];
+  segs.sort((a,b)=>b.length-a.length);
+  let path=segs.shift().slice();
+  while(segs.length){
+    let bi=0,bd=Infinity,mode=1;
+    const s0=path[0],s1=path[path.length-1];
+    for(let i=0;i<segs.length;i++){
+      const t=segs[i],t0=t[0],t1=t[t.length-1];
+      const cands=[[dist2(s1,t0),1],[dist2(s1,t1),2],[dist2(s0,t0),3],[dist2(s0,t1),4]];
+      for(const c of cands) if(c[0]<bd){bd=c[0];bi=i;mode=c[1];}
+    }
+    const t=segs.splice(bi,1)[0];
+    if(mode===1) path=path.concat(t);
+    else if(mode===2) path=path.concat(t.slice().reverse());
+    else if(mode===3) path=t.slice().reverse().concat(path);
+    else path=t.concat(path);
+  }
+  return path;
+}
+function haverMi(a,b){
+  const R=3958.8,toR=Math.PI/180,dLa=(b[0]-a[0])*toR,dLo=(b[1]-a[1])*toR;
+  const h=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(a[0]*toR)*Math.cos(b[0]*toR)*Math.sin(dLo/2)*Math.sin(dLo/2);
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+function samplePath(path,n){
+  const cum=[0];
+  for(let i=1;i<path.length;i++) cum.push(cum[i-1]+haverMi(path[i-1],path[i]));
+  const total=cum[cum.length-1];
+  const pts=[],dists=[];
+  for(let k=0;k<n;k++){
+    const target=total*k/(n-1);
+    let i=cum.findIndex(c=>c>=target);
+    if(i===-1) i=path.length-1;
+    if(i===0) i=1;
+    const f=(target-cum[i-1])/Math.max(cum[i]-cum[i-1],1e-9);
+    pts.push([path[i-1][0]+(path[i][0]-path[i-1][0])*f, path[i-1][1]+(path[i][1]-path[i-1][1])*f]);
+    dists.push(target);
+  }
+  return {pts:pts, dists:dists, total:total};
+}
+
+// =================================================================
+// ELEVATION PROFILE (Open-Meteo elevation API)
+// =================================================================
+const eleCache = {};
+const profEl = document.getElementById('profile');
+const profSvg = document.getElementById('profSvg');
+const profTitle = document.getElementById('profTitle');
+document.getElementById('profClose').onclick = ()=>{ profEl.style.display='none'; };
+
+function hideProfile(){ profEl.style.display='none'; profSvg.innerHTML=''; }
+
+async function showProfile(r){
+  const ways = matchedWays(r);
+  if(!ways.length){ hideProfile(); return; }
+  profEl.style.display='block';
+  profTitle.innerHTML = '<b>'+r.name+'</b> — loading elevation…';
+  profSvg.innerHTML='';
+  const sampled = samplePath(orderWays(ways), 80);
+  const key = regionKey+':'+r.id;
+  try{
+    let eles = eleCache[key];
+    if(!eles){
+      const u = 'https://api.open-meteo.com/v1/elevation?latitude='+
+        sampled.pts.map(p=>p[0].toFixed(5)).join(',')+'&longitude='+
+        sampled.pts.map(p=>p[1].toFixed(5)).join(',');
+      const resp = await fetch(u);
+      if(!resp.ok) throw new Error(resp.status);
+      const j = await resp.json();
+      if(!j.elevation || !j.elevation.length) throw new Error('empty');
+      eles = j.elevation; eleCache[key]=eles;
+    }
+    if(selected!==r.id) return; // user moved on while loading
+    drawProfile(r, sampled, eles);
+  }catch(e){
+    if(selected===r.id) profTitle.innerHTML = '<b>'+r.name+'</b> — elevation unavailable (offline?)';
+  }
+}
+
+function drawProfile(r, sampled, elesM){
+  // light smoothing, metres -> feet
+  const ft = elesM.map((e,i)=>{
+    const a=elesM[Math.max(0,i-1)], b=elesM[Math.min(elesM.length-1,i+1)];
+    return (a+e+b)/3*3.28084;
+  });
+  let climb=0;
+  for(let i=1;i<ft.length;i++) climb += Math.max(0, ft[i]-ft[i-1]);
+  const W=860,H=110,L=46,Rp=8,T=10,B=16;
+  const min=Math.min.apply(null,ft), max=Math.max.apply(null,ft);
+  const span=Math.max(max-min,40);
+  const x=i=>L+(W-L-Rp)*sampled.dists[i]/sampled.total;
+  const y=v=>T+(H-T-B)*(1-(v-min)/span);
+  let d='M'+x(0).toFixed(1)+','+y(ft[0]).toFixed(1);
+  for(let i=1;i<ft.length;i++) d+='L'+x(i).toFixed(1)+','+y(ft[i]).toFixed(1);
+  const area=d+'L'+x(ft.length-1).toFixed(1)+','+(H-B)+'L'+L+','+(H-B)+'Z';
+  const accent=getComputedStyle(document.body).getPropertyValue('--accent').trim()||'#f0a843';
+  let ticks='';
+  for(let k=0;k<=4;k++){
+    const mi=sampled.total*k/4, tx=L+(W-L-Rp)*k/4;
+    ticks+='<text x="'+tx+'" y="'+(H-3)+'" font-size="9.5" fill="#9aa6b1" text-anchor="middle">'+mi.toFixed(1)+' mi</text>';
+  }
+  profSvg.innerHTML =
+    '<path d="'+area+'" fill="'+accent+'" opacity="0.22"/>'+
+    '<path d="'+d+'" fill="none" stroke="'+accent+'" stroke-width="2"/>'+
+    '<text x="4" y="'+(T+6)+'" font-size="9.5" fill="#9aa6b1">'+Math.round(max).toLocaleString()+' ft</text>'+
+    '<text x="4" y="'+(H-B)+'" font-size="9.5" fill="#9aa6b1">'+Math.round(min).toLocaleString()+' ft</text>'+
+    ticks;
+  profTitle.innerHTML = '<b>'+r.name+'</b> — '+sampled.total.toFixed(1)+' mi of mapped trail · ≈+'+
+    Math.round(climb).toLocaleString()+' ft climb (GPS estimate; profile follows stitched OSM segments, may differ from the curated route)';
+}
+
+// =================================================================
+// GPX EXPORT
+// =================================================================
+function downloadGPX(r){
+  const ways = matchedWays(r);
+  if(!ways.length){ alert('Trail lines are still loading (or unavailable offline) — try again in a moment.'); return; }
+  const path = orderWays(ways);
+  const esc = s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let g = '<?xml version="1.0" encoding="UTF-8"?>\n'+
+    '<gpx version="1.1" creator="AZ Trail Run Planner" xmlns="http://www.topografix.com/GPX/1/1">\n'+
+    '<metadata><name>'+esc(r.name)+'</name><desc>'+esc(r.dist+' / '+r.gain+' — '+r.type+'. Stitched from OpenStreetMap trail segments; review before following.')+'</desc></metadata>\n'+
+    '<trk><name>'+esc(r.name)+'</name><trkseg>\n';
+  path.forEach(p=>{ g+='<trkpt lat="'+p[0].toFixed(6)+'" lon="'+p[1].toFixed(6)+'"></trkpt>\n'; });
+  g += '</trkseg></trk>\n</gpx>\n';
+  const blob = new Blob([g],{type:'application/gpx+xml'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = r.id+'-'+regionKey+'.gpx';
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500);
+}
+
+// =================================================================
+// CARDS & HIGHLIGHTING
+// =================================================================
+function estTime(run){
+  const pace = parseFloat(document.getElementById('pace').value)||11;
+  const f = d => {
+    const mins = d*pace + run.gainN/100;
+    const h = Math.floor(mins/60), m = Math.round(mins%60);
+    return h>0 ? h+'h '+(m<10?'0':'')+m+'m' : m+' min';
+  };
+  return run.distLo===run.distHi ? '~'+f(run.distLo) : f(run.distLo)+' – '+f(run.distHi);
+}
+
+function render(){
+  cardsEl.innerHTML='';
+  R().runs.filter(r=>filter==='all'||r.diff===filter).forEach(r=>{
+    const c = document.createElement('div');
+    c.className = 'card'+(selected===r.id?' selected':'');
+    const drive = r.drive ? '<span>🚗 <b>'+r.drive+'</b> from home</span>' : '';
+    c.innerHTML =
+      '<h3><span class="dot" style="background:'+DIFF_COLOR[r.diff]+'"></span>'+r.name+
+      '<span class="badge" style="background:'+DIFF_COLOR[r.diff]+'">'+(r.diff==='Hard'?'HARD':r.diff.toUpperCase())+'</span></h3>'+
+      '<div class="stats"><span>📏 <b>'+r.dist+'</b></span><span>⛰️ <b>'+r.gain+'</b></span><span>🔁 '+r.type+'</span><span>⏱️ <b>'+estTime(r)+'</b></span>'+drive+'</div>'+
+      '<div class="detail">'+r.desc+
+        '<div class="row"><span class="lbl">Route</span><br>'+r.route+'</div>'+
+        '<div class="row"><span class="lbl">Start</span><br>'+r.th+'</div>'+
+        '<div class="row"><button class="gpxbtn">⬇️ GPX</button><button class="gpxbtn flybtn" style="margin-left:6px">🏔 3D fly-through</button><span class="gpxnote">GPX for watch / Strava</span></div></div>';
+    c.onclick = ()=>selectRun(r);
+    c.querySelector('.gpxbtn').onclick = (e)=>{ e.stopPropagation(); downloadGPX(r); };
+    c.querySelector('.flybtn').onclick = (e)=>{ e.stopPropagation(); if(window.launchFly) window.launchFly(r); };
+    cardsEl.appendChild(c);
+  });
+}
+
+function selectRun(r){
+  selected = (selected===r.id) ? null : r.id;
+  hlLayer.clearLayers();
+  if(selected){
+    let bounds = null;
+    (trailCache[regionKey]||[]).forEach(w=>{
+      if(r.match.some(m=>w.norm.includes(m))){
+        const pl = L.polyline(w.latlngs,{color:DIFF_COLOR[r.diff],weight:5,opacity:.95})
+          .bindTooltip(w.name,{sticky:true}).addTo(hlLayer);
+        bounds = bounds ? bounds.extend(pl.getBounds()) : L.latLngBounds(pl.getBounds());
+      }
+    });
+    if(bounds && bounds.isValid()) map.fitBounds(bounds.pad(0.12));
+    else map.setView(r.focus, r.zoom);
+    showProfile(r);
+  } else {
+    hideProfile();
+  }
+  render();
+}
+
+// =================================================================
+// WIRING
+// =================================================================
+document.querySelectorAll('.rbtn').forEach(b=>b.onclick=()=>setRegion(b.dataset.r));
+document.querySelectorAll('.fbtn').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.fbtn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); filter=b.dataset.f; render();
+});
+document.getElementById('pace').addEventListener('input',render);
+
+setRegion('south');
+</script>
+
+<!-- ================= 3D FLY-THROUGH OVERLAY ================= -->
+<style>
+  #fly{position:fixed;inset:0;z-index:5000;background:#0b0e12;display:none}
+  #flyC{display:block;width:100%;height:100%}
+  .fpanel{position:absolute;background:rgba(16,20,26,.84);backdrop-filter:blur(6px);
+    border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 14px;color:#e8ebee}
+  #fly_hud{top:14px;left:14px;width:300px}
+  #fly_hud h1{font-size:15px;margin-bottom:2px}
+  #fly_hud .sub{font-size:11px;color:#9aa6b1;margin-bottom:10px}
+  .fstatrow{display:flex;gap:7px;margin-bottom:10px}
+  .fstat{flex:1;background:rgba(255,255,255,.06);border-radius:8px;padding:6px 4px;text-align:center}
+  .fstat .v{font-size:14px;font-weight:700;color:#f0a843}
+  .fstat .l{font-size:9px;color:#9aa6b1;text-transform:uppercase;letter-spacing:.5px}
+  .fctl{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11px;color:#9aa6b1}
+  .fctl input[type=range]{flex:1;accent-color:#f0a843}
+  #fly button{width:100%}
+  #fly .fbtnrow{display:flex;gap:8px;margin-top:8px}
+  #fly .fsec{background:rgba(255,255,255,.12);color:#e8ebee;font-weight:600}
+  #fly .flapse{width:auto;padding:4px 12px;background:rgba(255,255,255,.1);color:#9aa6b1;font-size:11px;font-weight:600;border-radius:7px}
+  #fly .flapse.on{background:#f0a843;color:#14181d}
+  #fly_close{position:absolute;top:14px;right:14px;width:auto !important;padding:8px 16px;z-index:5600;
+    background:rgba(16,20,26,.84);color:#e8ebee;border:1px solid rgba(255,255,255,.15);font-weight:700}
+  #fly_mini{top:64px;right:14px;padding:8px}
+  #fly_scrubwrap{left:14px;right:14px;bottom:14px;padding:10px 14px}
+  #fly_prof{width:100%;height:54px;display:block;cursor:pointer}
+  #fly_scrub{width:100%;accent-color:#f0a843;margin-top:2px}
+  #fly_loading{position:absolute;inset:0;display:none;flex-direction:column;gap:14px;align-items:center;justify-content:center;background:#0b0e12;z-index:5500}
+  #fly_loading .spin{width:42px;height:42px;border:4px solid rgba(240,168,67,.25);border-top-color:#f0a843;border-radius:50%;animation:fsp 1s linear infinite}
+  @keyframes fsp{to{transform:rotate(360deg)}}
+  #fly_err{display:none;max-width:420px;text-align:center;font-size:13px;color:#f3c98b}
+  #fly_ms{display:none;left:50%;top:50%;transform:translate(-50%,-54%);width:340px;z-index:5400;padding:0;overflow:hidden}
+  #fly_msImg{width:100%;height:170px;object-fit:cover;display:none;background:#222}
+  #fly_msBody{padding:13px 16px 15px}
+  #fly_msBody h2{font-size:16px;margin-bottom:2px}
+  #fly_msMeta{font-size:11px;color:#f0a843;margin-bottom:8px;font-weight:600}
+  #fly_msFact{font-size:12.5px;line-height:1.55;color:#c6ced6}
+  #fly_msBody button{margin-top:12px}
+  #fly_recap{display:none;left:50%;top:50%;transform:translate(-50%,-50%);width:330px;z-index:5450;text-align:center;padding:22px 20px}
+  #fly_recap h2{font-size:20px;margin-bottom:4px}
+  #fly_recap .sub2{font-size:12px;color:#9aa6b1;margin-bottom:14px}
+  #fly_recapStats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+  #fly_conf{position:absolute;inset:0;pointer-events:none;z-index:5420}
+  #fly_attr{position:absolute;bottom:96px;right:14px;font-size:9.5px;color:rgba(255,255,255,.45)}
+</style>
+<div id="fly">
+  <canvas id="flyC"></canvas>
+  <button id="fly_close">✕ Back to map</button>
+  <div id="fly_hud" class="fpanel">
+    <h1 id="fly_title">🏃 Fly-through</h1>
+    <div class="sub" id="fly_sub"></div>
+    <div class="fstatrow">
+      <div class="fstat"><div class="v" id="fly_mile">0.0</div><div class="l">mile</div></div>
+      <div class="fstat"><div class="v" id="fly_ele">—</div><div class="l">elev ft</div></div>
+      <div class="fstat"><div class="v" id="fly_grade">—</div><div class="l">grade</div></div>
+      <div class="fstat"><div class="v" id="fly_time">0:00</div><div class="l">run time</div></div>
+    </div>
+    <div class="fbtnrow">
+      <button id="fly_play">▶ Run it</button>
+      <button id="fly_mode" class="fsec">🌍 Orbit</button>
+    </div>
+    <div class="fbtnrow">
+      <button id="fly_ghost" class="fsec">👻 Pacer: on</button>
+      <button id="fly_sun" class="fsec">🌅 Sunrise</button>
+    </div>
+    <div class="fctl">Pace <input id="fly_speed" type="range" min="1" max="12" value="6" step="0.5"><span id="fly_speedLbl">6 mph</span></div>
+    <div class="fctl">Pacer <input id="fly_gpace" type="range" min="1" max="12" value="5" step="0.5"><span id="fly_gpaceLbl">5 mph</span></div>
+    <div class="fctl">Time-lapse
+      <button class="flapse" data-l="1">1×</button>
+      <button class="flapse on" data-l="10">10×</button>
+      <button class="flapse" data-l="30">30×</button>
+    </div>
+    <div class="fctl" id="fly_finish"></div>
+    <div class="fctl">Terrain ×<input id="fly_exag" type="range" min="10" max="25" value="15"><span id="fly_exagLbl">1.5</span></div>
+  </div>
+  <div id="fly_mini" class="fpanel"><canvas id="fly_miniCv" width="190" height="148"></canvas></div>
+  <div id="fly_scrubwrap" class="fpanel">
+    <canvas id="fly_prof"></canvas>
+    <input id="fly_scrub" type="range" min="0" max="1000" value="0">
+  </div>
+  <div id="fly_ms" class="fpanel">
+    <img id="fly_msImg" alt="">
+    <div id="fly_msBody">
+      <h2 id="fly_msName"></h2><div id="fly_msMeta"></div><div id="fly_msFact"></div>
+      <button id="fly_msResume">▶ Keep running</button>
+    </div>
+  </div>
+  <canvas id="fly_conf"></canvas>
+  <div id="fly_recap" class="fpanel">
+    <h2>🏁 Run complete!</h2><div class="sub2" id="fly_recapSub"></div>
+    <div id="fly_recapStats"></div>
+    <button id="fly_again">🔁 Run it again</button>
+  </div>
+  <div id="fly_attr">Imagery © Esri · Terrain: Mapzen/AWS · Trail © OpenStreetMap</div>
+  <div id="fly_loading"><div class="spin"></div><div id="fly_loadmsg">Loading…</div><div id="fly_err"></div></div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+
+// milestones (South Mountain only; auto-attach to any run passing within 300 m)
+const FLY_MS=[
+ {name:"Pima Canyon",lat:33.3520,lon:-112.0190,q:"South Mountain Park Phoenix",fact:"The eastern gateway. South Mountain Park began in 1924 when Phoenix bought 13,000 acres for $17,000 — today it's one of the largest city parks in North America."},
+ {name:"Hidden Valley & Fat Man's Pass",lat:33.3370,lon:-112.0260,q:"Fat Man's Pass Hidden Valley South Mountain",fact:"Squeeze through Fat Man's Pass, cross the sandy valley, exit via a natural rock tunnel. Hohokam petroglyphs (~600–1450 CE) dot the rocks nearby."},
+ {name:"Buena Vista Lookout",lat:33.3344,lon:-112.0427,q:"Buena Vista Lookout South Mountain Phoenix",fact:"Drive-up overlook where the trail crosses Summit Road — the easiest bail-out on the ridge and a favorite dusk viewpoint."},
+ {name:"Mt. Suppoa TV Towers",lat:33.3355,lon:-112.0565,q:"South Mountain Phoenix antenna towers",fact:"The antenna farm on Mt. Suppoa (2,690 ft, the range's true summit) broadcasts most of Phoenix's TV and radio. The trail contours just below the fence."},
+ {name:"Dobbins Lookout spur",lat:33.3399,lon:-112.0594,q:"Dobbins Lookout South Mountain",fact:"A short spur reaches Dobbins Lookout (2,330 ft) and its stone shelter, built by Civilian Conservation Corps crews in the 1930s."},
+ {name:"Telegraph Pass",lat:33.3300,lon:-112.0680,q:"Telegraph Pass Phoenix Arizona",fact:"Named for the 1870s telegraph line that linked Phoenix to the outside world via Maricopa Wells. Kiwanis drops north; Telegraph Pass Trail drops south."},
+ {name:"Goat Hill saddle",lat:33.3330,lon:-112.0880,q:"South Mountain Park trail Phoenix desert",fact:"The quiet half begins — CCC-built switchbacks from the 1930s still carry the trail. Look for hand-laid rockwork on the descents."},
+ {name:"San Juan Lookout",lat:33.3290,lon:-112.1170,q:"San Juan Lookout South Mountain",fact:"The western terminus above the San Juan valley — the far, empty end of the park."}
+];
+
+const lon2tx=(lon,z)=>(lon+180)/360*Math.pow(2,z);
+const lat2ty=(lat,z)=>(1-Math.log(Math.tan(lat*Math.PI/180)+1/Math.cos(lat*Math.PI/180))/Math.PI)/2*Math.pow(2,z);
+const haverMt=(a,b)=>{const R=6371000,t=Math.PI/180,dLa=(b[0]-a[0])*t,dLo=(b[1]-a[1])*t;
+  const h=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(a[0]*t)*Math.cos(b[0]*t)*Math.sin(dLo/2)*Math.sin(dLo/2);
+  return 2*R*Math.asin(Math.sqrt(h));};
+
+let active=false,rafId=null,renderer=null;
+let scene,camera,terrain,tube,runnerF,ghostF,matDay,matSun;
+let heights,PW,PH,tx0,ty0,ZT,M_PER_PX,W_M,H_M;
+let fpath=[],ftotal=0,fgain=0,fminH=0,fmaxH=0;
+let playing=false,progress=0,modeV='follow',LAPSE=10,EXAG=1.5;
+let ghostOn=true,ghostDist=0,sunOn=false,recapShown=false,curRun=null;
+let beacons=[],mileObjs=[],ms=[];
+let orb={az:-1,el:.62,dist:2600,dragging:false,lx:0,ly:0};
+let disposables=[],miniBase=null,miniScale=null,lastT=0;
+
+function ll2px(lat,lon){return [(lon2tx(lon,ZT)-tx0)*256,(lat2ty(lat,ZT)-ty0)*256];}
+function sampleH(px,py){
+  px=Math.max(0,Math.min(PW-1.001,px));py=Math.max(0,Math.min(PH-1.001,py));
+  const x0=Math.floor(px),y0=Math.floor(py),fx=px-x0,fy=py-y0,i=(x,y)=>heights[y*PW+x];
+  return i(x0,y0)*(1-fx)*(1-fy)+i(x0+1,y0)*fx*(1-fy)+i(x0,y0+1)*(1-fx)*fy+i(x0+1,y0+1)*fx*fy;
+}
+function loadImg(url){return new Promise((res,rej)=>{const im=new Image();im.crossOrigin='anonymous';
+  im.onload=()=>res(im);im.onerror=()=>rej(new Error('tile'));im.src=url;});}
+async function tileCanvas(urlFn,x0,x1,y0,y1){
+  const cv=document.createElement('canvas');cv.width=(x1-x0+1)*256;cv.height=(y1-y0+1)*256;
+  const ctx=cv.getContext('2d');const jobs=[];
+  for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++)
+    jobs.push(loadImg(urlFn(x,y)).then(im=>ctx.drawImage(im,(x-x0)*256,(y-y0)*256)).catch(()=>{}));
+  await Promise.all(jobs);return cv;
+}
+
+function buildFig(isGhost){
+  const g=new THREE.Group();
+  const M=c=>isGhost?new THREE.MeshBasicMaterial({color:0xcfd8ff,transparent:true,opacity:.38,depthWrite:false})
+                    :new THREE.MeshBasicMaterial({color:c});
+  const skin=M(0xc8956c),jersey=M(0x00e5ff),shortsM=M(0x16242f),shoe=M(0xffffff),capM=M(0xe74c3c);
+  const pelvis=new THREE.Mesh(new THREE.SphereGeometry(1.25,10,8),shortsM);pelvis.scale.set(1.15,.8,.9);pelvis.position.y=7.4;g.add(pelvis);
+  const torso=new THREE.Mesh(new THREE.CylinderGeometry(1.45,1.05,3.6,12),jersey);torso.position.y=10;g.add(torso);
+  const sh2=new THREE.Mesh(new THREE.SphereGeometry(1.35,10,8),jersey);sh2.scale.set(1.25,.6,.85);sh2.position.y=11.8;g.add(sh2);
+  const neck=new THREE.Mesh(new THREE.CylinderGeometry(.4,.45,.8,8),skin);neck.position.y=12.5;g.add(neck);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(1.05,12,10),skin);head.position.y=13.7;g.add(head);
+  const cap=new THREE.Mesh(new THREE.SphereGeometry(1.1,12,8,0,Math.PI*2,0,Math.PI/2),capM);cap.position.y=13.8;cap.rotation.x=-.15;g.add(cap);
+  const seg=(len,r1,r2,m)=>{const x=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,len,10),m);x.position.y=-len/2;return x;};
+  const joint=(r,m)=>new THREE.Mesh(new THREE.SphereGeometry(r,8,8),m);
+  function leg(side){
+    const hip=new THREE.Group();hip.position.set(side*.8,7.2,0);
+    hip.add(joint(.75,shortsM));hip.add(seg(3.4,.72,.56,skin));
+    const sh=new THREE.Mesh(new THREE.CylinderGeometry(.88,.72,1.7,10),shortsM);sh.position.y=-.85;hip.add(sh);
+    const knee=new THREE.Group();knee.position.y=-3.4;hip.add(knee);
+    knee.add(joint(.55,skin));knee.add(seg(3.2,.5,.36,skin));
+    const foot=new THREE.Mesh(new THREE.BoxGeometry(.75,.5,1.7),shoe);foot.position.set(0,-3.25,.45);knee.add(foot);
+    g.add(hip);return{hip:hip,knee:knee};
+  }
+  function arm(side){
+    const sh=new THREE.Group();sh.position.set(side*1.85,11.7,0);
+    sh.add(joint(.6,jersey));sh.add(seg(2.6,.5,.4,skin));
+    const el=new THREE.Group();el.position.y=-2.6;sh.add(el);
+    el.add(joint(.42,skin));el.add(seg(2.4,.38,.3,skin));
+    const hand=joint(.42,skin);hand.position.y=-2.5;el.add(hand);
+    el.rotation.x=-1.2;g.add(sh);return{sh:sh,el:el};
+  }
+  g.userData={Ll:leg(1),Lr:leg(-1),Al:arm(1),Ar:arm(-1)};
+  g.scale.setScalar(1.45);g.rotation.order='YXZ';
+  return g;
+}
+function poseFig(fig,ph,running){
+  const u=fig.userData;
+  const gait=(L,A,phase)=>{
+    const s=running?Math.sin(phase):0;
+    L.hip.rotation.x=-s*.78;
+    L.knee.rotation.x=running?.28+1.05*Math.max(0,Math.sin(phase-1.15)):.22;
+    A.sh.rotation.x=running?Math.sin(phase)*.62:0;
+    A.el.rotation.x=-1.2+(running?Math.sin(phase)*.18:0);
+  };
+  gait(u.Ll,u.Al,ph);gait(u.Lr,u.Ar,ph+Math.PI);
+  fig.rotation.z=running?Math.sin(ph)*.045:0;
+}
+function mileSprite(n){
+  const cv=document.createElement('canvas');cv.width=96;cv.height=64;
+  const g=cv.getContext('2d');
+  g.fillStyle='rgba(16,20,26,.88)';g.fillRect(8,4,80,56);
+  g.strokeStyle='#f0a843';g.lineWidth=3;g.strokeRect(8,4,80,56);
+  g.fillStyle='#f0a843';g.font='bold 38px sans-serif';g.textAlign='center';g.textBaseline='middle';
+  g.fillText(n,48,33);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true}));
+  sp.scale.set(84,56,1);return sp;
+}
+const fmtHM=s=>{if(!isFinite(s))return '—';const h=Math.floor(s/3600),m=Math.round(s%3600/60);
+  return h>0?h+':'+String(m).padStart(2,'0'):'0:'+String(m).padStart(2,'0');};
+
+// ---------------- BUILD ----------------
+async function build(run,ways){
+  disposables.forEach(d=>{try{d.dispose();}catch(e){}});disposables=[];
+  beacons=[];mileObjs=[];ms=[];fpath=[];fgain=0;fminH=1e9;fmaxH=-1e9;
+
+  let raw=orderWays(ways);                       // from the planner script
+  if(raw[0][1]<raw[raw.length-1][1]) raw.reverse(); // start at the east end
+  // bbox with margin
+  let la0=1e9,la1=-1e9,lo0=1e9,lo1=-1e9;
+  raw.forEach(p=>{la0=Math.min(la0,p[0]);la1=Math.max(la1,p[0]);lo0=Math.min(lo0,p[1]);lo1=Math.max(lo1,p[1]);});
+  la0-=.013;la1+=.013;lo0-=.016;lo1+=.016;
+  ZT=14;
+  for(let z=14;z>=11;z--){
+    const nx=Math.floor(lon2tx(lo1,z))-Math.floor(lon2tx(lo0,z))+1;
+    const ny=Math.floor(lat2ty(la0,z))-Math.floor(lat2ty(la1,z))+1;
+    if(nx*ny<=24){ZT=z;break;}
+  }
+  tx0=Math.floor(lon2tx(lo0,ZT));const tx1=Math.floor(lon2tx(lo1,ZT));
+  ty0=Math.floor(lat2ty(la1,ZT));const ty1=Math.floor(lat2ty(la0,ZT));
+  PW=(tx1-tx0+1)*256;PH=(ty1-ty0+1)*256;
+  const lat0=(la0+la1)/2;
+  M_PER_PX=40075016.686/Math.pow(2,ZT)/256*Math.cos(lat0*Math.PI/180);
+  W_M=PW*M_PER_PX;H_M=PH*M_PER_PX;
+
+  $('fly_loadmsg').textContent='Loading elevation tiles…';
+  const ecv=await tileCanvas((x,y)=>'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/'+ZT+'/'+x+'/'+y+'.png',tx0,tx1,ty0,ty1);
+  const ed=ecv.getContext('2d').getImageData(0,0,PW,PH).data;
+  heights=new Float32Array(PW*PH);
+  for(let i=0;i<PW*PH;i++)heights[i]=ed[i*4]*256+ed[i*4+1]+ed[i*4+2]/256-32768;
+  $('fly_loadmsg').textContent='Loading satellite imagery…';
+  const ZI=ZT+1;
+  const icv=await tileCanvas((x,y)=>'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/'+ZI+'/'+y+'/'+x,tx0*2,tx1*2+1,ty0*2,ty1*2+1);
+  $('fly_loadmsg').textContent='Building terrain…';
+
+  // dense path
+  const dense=[raw[0]];
+  for(let i=1;i<raw.length;i++){
+    const d=haverMt(raw[i-1],raw[i]),steps=Math.max(1,Math.floor(d/25));
+    for(let s=1;s<=steps;s++)dense.push([raw[i-1][0]+(raw[i][0]-raw[i-1][0])*s/steps,raw[i-1][1]+(raw[i][1]-raw[i-1][1])*s/steps]);
+  }
+  let acc=0;
+  for(let i=0;i<dense.length;i++){
+    if(i>0)acc+=haverMt(dense[i-1],dense[i]);
+    const px=ll2px(dense[i][0],dense[i][1]);
+    const h=sampleH(px[0],px[1]);
+    fminH=Math.min(fminH,h);fmaxH=Math.max(fmaxH,h);
+    fpath.push({lat:dense[i][0],lon:dense[i][1],x:px[0]*M_PER_PX-W_M/2,z:px[1]*M_PER_PX-H_M/2,h:h,distM:acc});
+  }
+  ftotal=acc;
+  for(let k=4;k<fpath.length;k+=4)fgain+=Math.max(0,fpath[k].h-fpath[k-4].h);
+
+  // scene
+  if(!renderer){renderer=new THREE.WebGLRenderer({canvas:$('flyC'),antialias:true});
+    renderer.setPixelRatio(Math.min(devicePixelRatio,2));}
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(sunOn?0xf2b27a:0x87b5d8);
+  scene.fog=new THREE.Fog(scene.background.getHex(),6000,22000);
+  camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,2,60000);
+
+  const SEGX=PW/4-1,SEGY=PH/4-1;
+  const geo=new THREE.PlaneGeometry(W_M,H_M,SEGX,SEGY);
+  geo.rotateX(-Math.PI/2);
+  const pos=geo.attributes.position;
+  for(let iy=0;iy<=SEGY;iy++)for(let ix=0;ix<=SEGX;ix++)
+    pos.setY(iy*(SEGX+1)+ix,sampleH(ix*4,iy*4));
+  geo.computeVertexNormals();
+  const tex=new THREE.CanvasTexture(icv);tex.anisotropy=4;
+  matDay=new THREE.MeshBasicMaterial({map:tex});
+  matSun=new THREE.MeshLambertMaterial({map:tex});
+  disposables.push(geo,tex,matDay,matSun);
+  terrain=new THREE.Mesh(geo,sunOn?matSun:matDay);
+  terrain.scale.y=EXAG;scene.add(terrain);
+  const sun=new THREE.DirectionalLight(0xffc890,1.35);sun.position.set(8000,1700,-2500);scene.add(sun);
+  scene.add(new THREE.AmbientLight(0x7a89a8,.85));
+
+  const curvePts=fpath.filter((_,i)=>i%3===0).map(p=>new THREE.Vector3(p.x,p.h+6,p.z));
+  const tg=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(curvePts),Math.min(curvePts.length*2,4000),5.5,6,false);
+  disposables.push(tg);
+  tube=new THREE.Mesh(tg,new THREE.MeshBasicMaterial({color:0xe8703a,transparent:true,opacity:.7}));
+  tube.scale.y=EXAG;scene.add(tube);
+
+  const mk=(p,col)=>{const grp=new THREE.Group();
+    const pole=new THREE.Mesh(new THREE.CylinderGeometry(1.6,1.6,55,8),new THREE.MeshBasicMaterial({color:0xeeeeee}));
+    pole.position.y=27;grp.add(pole);
+    const flag=new THREE.Mesh(new THREE.ConeGeometry(9,22,10),new THREE.MeshBasicMaterial({color:col}));
+    flag.position.y=58;grp.add(flag);
+    grp.position.set(p.x,p.h*EXAG,p.z);scene.add(grp);};
+  mk(fpath[0],0x2ecc71);mk(fpath[fpath.length-1],0xc0392b);
+
+  runnerF=buildFig(false);scene.add(runnerF);
+  ghostF=buildFig(true);scene.add(ghostF);
+
+  // milestones within 300 m of this route
+  FLY_MS.forEach(m0=>{
+    let bi=0,bd=1e18;
+    for(let k=0;k<fpath.length;k++){
+      const d=haverMt([fpath[k].lat,fpath[k].lon],[m0.lat,m0.lon]);
+      if(d<bd){bd=d;bi=k;}
+    }
+    if(bd<300){
+      const m=Object.assign({},m0);
+      m.dist=fpath[bi].distM;m.x=fpath[bi].x;m.z=fpath[bi].z;m.h=fpath[bi].h;m.visited=false;m.img=null;
+      ms.push(m);
+      const b=new THREE.Mesh(new THREE.OctahedronGeometry(20),new THREE.MeshBasicMaterial({color:0xffd24d,transparent:true,opacity:.9}));
+      b.userData=m;scene.add(b);beacons.push(b);
+    }
+  });
+  ms.sort((a,b)=>a.dist-b.dist);
+  loadPhotos();
+
+  const totMi=Math.floor(ftotal/1609.34);
+  for(let n=1;n<=totMi;n++){
+    let k=fpath.findIndex(p=>p.distM>=n*1609.34);if(k<0)k=fpath.length-1;
+    const post=new THREE.Mesh(new THREE.CylinderGeometry(2,2,44,8),new THREE.MeshBasicMaterial({color:0xdddddd}));
+    const sp=mileSprite(n);scene.add(post);scene.add(sp);
+    mileObjs.push({post:post,sp:sp,x:fpath[k].x,z:fpath[k].z,h:fpath[k].h});
+  }
+  buildMini();
+  drawFlyProf();
+}
+async function loadPhotos(){
+  for(const m of ms){
+    try{
+      const u='https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*'+
+        '&generator=search&gsrsearch='+encodeURIComponent(m.q)+'&gsrlimit=1&gsrnamespace=6'+
+        '&prop=imageinfo&iiprop=url&iiurlwidth=640';
+      const r=await fetch(u);const j=await r.json();
+      const pages=j.query&&j.query.pages;
+      if(pages){const pg=Object.values(pages)[0];
+        if(pg.imageinfo&&pg.imageinfo[0].thumburl)m.img=pg.imageinfo[0].thumburl;}
+    }catch(e){}
+  }
+}
+
+// ---------------- minimap / profile ----------------
+function buildMini(){
+  const cv=document.createElement('canvas');cv.width=190;cv.height=148;
+  const g=cv.getContext('2d');
+  let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;
+  fpath.forEach(p=>{x0=Math.min(x0,p.x);x1=Math.max(x1,p.x);z0=Math.min(z0,p.z);z1=Math.max(z1,p.z);});
+  const pad=14,s=Math.min((190-2*pad)/Math.max(x1-x0,1),(148-2*pad)/Math.max(z1-z0,1));
+  miniScale={x0:x0,z0:z0,s:s,ox:(190-(x1-x0)*s)/2,oz:(148-(z1-z0)*s)/2};
+  g.fillStyle='rgba(255,255,255,.04)';g.fillRect(0,0,190,148);
+  g.beginPath();
+  fpath.forEach((p,i)=>{const X=miniScale.ox+(p.x-x0)*s,Z=miniScale.oz+(p.z-z0)*s;i?g.lineTo(X,Z):g.moveTo(X,Z);});
+  g.strokeStyle='#e8703a';g.lineWidth=2;g.stroke();
+  g.fillStyle='#ffd24d';
+  ms.forEach(m=>{const X=miniScale.ox+(m.x-x0)*s,Z=miniScale.oz+(m.z-z0)*s;g.beginPath();g.arc(X,Z,2.4,0,7);g.fill();});
+  miniBase=cv;
+}
+function drawMiniF(p,gp){
+  if(!miniBase)return;
+  const g=$('fly_miniCv').getContext('2d');
+  g.clearRect(0,0,190,148);g.drawImage(miniBase,0,0);
+  const dot=(pt,col,r)=>{const X=miniScale.ox+(pt.x-miniScale.x0)*miniScale.s,Z=miniScale.oz+(pt.z-miniScale.z0)*miniScale.s;
+    g.beginPath();g.arc(X,Z,r,0,7);g.fillStyle=col;g.fill();g.lineWidth=1.5;g.strokeStyle='#10141a';g.stroke();};
+  if(ghostOn&&gp)dot(gp,'#cfd8ff',4);
+  dot(p,'#00e5ff',5);
+}
+const fpc=$('fly_prof');
+function drawFlyProf(){
+  const dpr=devicePixelRatio||1;
+  fpc.width=fpc.clientWidth*dpr;fpc.height=54*dpr;
+  const g=fpc.getContext('2d');g.scale(dpr,dpr);
+  const w=fpc.clientWidth,h=54;
+  g.clearRect(0,0,w,h);g.beginPath();g.moveTo(0,h);
+  for(let i=0;i<fpath.length;i+=4)
+    g.lineTo(fpath[i].distM/ftotal*w,h-6-((fpath[i].h-fminH)/Math.max(fmaxH-fminH,1))*(h-12));
+  g.lineTo(w,h);g.closePath();
+  g.fillStyle='rgba(240,168,67,.3)';g.fill();
+  g.strokeStyle='#f0a843';g.lineWidth=1.5;g.stroke();
+  const cx=progress*w;
+  g.strokeStyle='#fff';g.lineWidth=2;g.beginPath();g.moveTo(cx,0);g.lineTo(cx,h);g.stroke();
+}
+fpc.addEventListener('click',e=>{
+  progress=Math.max(0,Math.min(1,e.offsetX/fpc.clientWidth));
+  $('fly_scrub').value=progress*1000;
+  ghostDist=progress*ftotal;resetVis();recapShown=progress>=1;
+});
+function resetVis(){const d=progress*ftotal;ms.forEach(m=>m.visited=m.dist<=d);}
+
+// ---------------- cards / recap ----------------
+function showCardF(m){
+  $('fly_msName').textContent=m.name;
+  $('fly_msMeta').textContent='Mile '+(m.dist/1609.34).toFixed(1)+' · '+Math.round(m.h*3.28084).toLocaleString()+' ft';
+  $('fly_msFact').textContent=m.fact;
+  const im=$('fly_msImg');
+  if(m.img){im.src=m.img;im.style.display='block';}else{im.style.display='none';}
+  $('fly_ms').style.display='block';
+}
+$('fly_msResume').onclick=()=>{$('fly_ms').style.display='none';setPlayF(true);};
+function showRecapF(mph){
+  recapShown=true;
+  const mi=ftotal/1609.34,gain=Math.round(fgain*3.28084);
+  const st=(v,l)=>'<div class="fstat"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>';
+  $('fly_recapSub').textContent=curRun.name;
+  $('fly_recapStats').innerHTML=st(mi.toFixed(1),'miles')+st('+'+gain.toLocaleString()+' ft','climbed')+
+    st(fmtHM(ftotal/(mph*0.44704)),'at '+mph+' mph')+st((60/mph).toFixed(1)+' min/mi','pace');
+  $('fly_recap').style.display='block';
+  confettiF();
+}
+$('fly_again').onclick=()=>{
+  $('fly_recap').style.display='none';
+  progress=0;ghostDist=0;recapShown=false;ms.forEach(m=>m.visited=false);
+  $('fly_scrub').value=0;setPlayF(true);
+};
+function confettiF(){
+  const cv=$('fly_conf');cv.width=innerWidth;cv.height=innerHeight;
+  const g=cv.getContext('2d');
+  const cols=['#f0a843','#00e5ff','#e74c3c','#2ecc71','#ffd24d','#fff'];
+  const ps=[];for(let i=0;i<160;i++)ps.push({x:innerWidth/2+(Math.random()-.5)*200,y:innerHeight/2,
+    vx:(Math.random()-.5)*9,vy:-4-Math.random()*7,c:cols[i%cols.length],r:3+Math.random()*4,a:Math.random()*6});
+  const t0=performance.now();
+  (function tick(){
+    const el=(performance.now()-t0)/1000;
+    g.clearRect(0,0,cv.width,cv.height);
+    if(el>3)return;
+    ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.18;p.a+=.1;
+      g.save();g.translate(p.x,p.y);g.rotate(p.a);g.fillStyle=p.c;g.fillRect(-p.r,-p.r/2,p.r*2,p.r);g.restore();});
+    requestAnimationFrame(tick);
+  })();
+}
+
+// ---------------- loop ----------------
+function animateF(ts){
+  if(!active)return;
+  rafId=requestAnimationFrame(animateF);
+  const dt=Math.min((ts-lastT)/1000||0,.1);lastT=ts;
+  const mph=+$('fly_speed').value;
+  if(playing){
+    progress+=dt*mph*0.44704*LAPSE/ftotal;
+    if(progress>=1){progress=1;setPlayF(false);}
+    $('fly_scrub').value=progress*1000;
+  }
+  const i=Math.max(0,Math.min(fpath.length-1,Math.round(progress*(fpath.length-1))));
+  const p=fpath[i],ahead=fpath[Math.min(fpath.length-1,i+14)];
+  const py=p.h*EXAG,fdx=ahead.x-p.x,fdz=ahead.z-p.z;
+
+  const ph=p.distM/16*Math.PI*2;
+  poseFig(runnerF,ph,playing);
+  runnerF.position.set(p.x,py+(playing?Math.abs(Math.cos(ph))*1.1:0),p.z);
+  runnerF.rotation.y=Math.atan2(fdx,fdz);
+  runnerF.rotation.x=playing?.14:0;
+
+  let gp=null;
+  if(ghostOn){
+    const gmph=+$('fly_gpace').value;
+    if(playing)ghostDist=Math.min(ftotal,ghostDist+dt*gmph*0.44704*LAPSE);
+    let gi=fpath.findIndex(q=>q.distM>=ghostDist);if(gi<0)gi=fpath.length-1;if(gi<1)gi=1;
+    gp=fpath[gi];const ga=fpath[Math.min(fpath.length-1,gi+10)];
+    const gph=ghostDist/16*Math.PI*2;
+    poseFig(ghostF,gph,playing&&ghostDist<ftotal);
+    ghostF.position.set(gp.x,gp.h*EXAG+(playing?Math.abs(Math.cos(gph))*1.1:0),gp.z);
+    ghostF.rotation.y=Math.atan2(ga.x-gp.x,ga.z-gp.z);
+    ghostF.rotation.x=playing?.14:0;ghostF.visible=true;
+  }else ghostF.visible=false;
+
+  beacons.forEach((b,k)=>{const m=b.userData;
+    b.rotation.y+=dt*1.2;
+    b.position.set(m.x,m.h*EXAG+62+Math.sin(ts/600+k)*7,m.z);
+    b.material.opacity=m.visited?.25:.9;});
+  mileObjs.forEach(o=>{o.post.position.set(o.x,o.h*EXAG+22,o.z);o.sp.position.set(o.x,o.h*EXAG+78,o.z);});
+
+  if(playing){
+    for(const m of ms){if(!m.visited&&p.distM>=m.dist){m.visited=true;setPlayF(false);showCardF(m);break;}}
+  }
+  if(progress>=1&&!recapShown)showRecapF(mph);
+
+  if(modeV==='follow'){
+    const L=Math.sqrt(fdx*fdx+fdz*fdz)||1,bx=-fdx/L,bz=-fdz/L;
+    camera.position.lerp(new THREE.Vector3(p.x+bx*130,py+72,p.z+bz*130),Math.min(1,dt*3));
+    camera.lookAt(ahead.x,ahead.h*EXAG+18,ahead.z);
+  }else{
+    camera.position.set(p.x+orb.dist*Math.cos(orb.el)*Math.cos(orb.az),
+      py+orb.dist*Math.sin(orb.el),p.z+orb.dist*Math.cos(orb.el)*Math.sin(orb.az));
+    camera.lookAt(p.x,py,p.z);
+  }
+
+  $('fly_mile').textContent=(p.distM/1609.34).toFixed(1);
+  $('fly_ele').textContent=Math.round(p.h*3.28084).toLocaleString();
+  const run2=ahead.distM-p.distM;
+  $('fly_grade').textContent=run2>1?((ahead.h-p.h)/run2*100).toFixed(0)+'%':'—';
+  $('fly_time').textContent=fmtHM(p.distM/(mph*0.44704));
+  drawFlyProf();drawMiniF(p,gp);
+  renderer.render(scene,camera);
+}
+
+// ---------------- UI ----------------
+function setPlayF(v){playing=v;$('fly_play').textContent=v?'⏸ Pause':'▶ Run it';}
+function updateFinishF(){
+  const mph=+$('fly_speed').value;
+  $('fly_speedLbl').textContent=mph+' mph';
+  if(ftotal>0)$('fly_finish').textContent='Finish at this pace: ~'+fmtHM(ftotal/(mph*0.44704))+
+    ' for '+(ftotal/1609.34).toFixed(1)+' mi ('+(60/mph).toFixed(1)+' min/mi)';
+}
+$('fly_play').onclick=()=>{if(progress>=1)progress=0;setPlayF(!playing);};
+$('fly_mode').onclick=function(){modeV=modeV==='follow'?'orbit':'follow';
+  this.textContent=modeV==='follow'?'🌍 Orbit':'🎥 Follow';};
+$('fly_ghost').onclick=function(){ghostOn=!ghostOn;this.textContent=ghostOn?'👻 Pacer: on':'👻 Pacer: off';};
+$('fly_sun').onclick=function(){
+  sunOn=!sunOn;
+  if(terrain)terrain.material=sunOn?matSun:matDay;
+  const sky=sunOn?0xf2b27a:0x87b5d8;
+  if(scene){scene.background=new THREE.Color(sky);scene.fog.color=new THREE.Color(sky);}
+  this.textContent=sunOn?'☀️ Midday':'🌅 Sunrise';
+};
+$('fly_speed').oninput=updateFinishF;
+$('fly_gpace').oninput=e=>$('fly_gpaceLbl').textContent=e.target.value+' mph';
+$('fly_exag').oninput=e=>{
+  EXAG=e.target.value/10;$('fly_exagLbl').textContent=EXAG.toFixed(1);
+  if(terrain){terrain.scale.y=EXAG;tube.scale.y=EXAG;}
+};
+document.querySelectorAll('.flapse').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.flapse').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');LAPSE=+b.dataset.l;
+});
+$('fly_scrub').oninput=e=>{progress=e.target.value/1000;ghostDist=progress*ftotal;resetVis();recapShown=progress>=1;};
+$('fly_close').onclick=()=>{active=false;if(rafId)cancelAnimationFrame(rafId);setPlayF(false);
+  $('fly_ms').style.display='none';$('fly_recap').style.display='none';$('fly').style.display='none';};
+const fcv=$('flyC');
+fcv.addEventListener('pointerdown',e=>{orb.dragging=true;orb.lx=e.clientX;orb.ly=e.clientY;});
+addEventListener('pointerup',()=>orb.dragging=false);
+addEventListener('pointermove',e=>{
+  if(!orb.dragging||modeV!=='orbit'||!active)return;
+  orb.az+=(e.clientX-orb.lx)*.005;
+  orb.el=Math.max(.08,Math.min(1.45,orb.el+(e.clientY-orb.ly)*.004));
+  orb.lx=e.clientX;orb.ly=e.clientY;
+});
+fcv.addEventListener('wheel',e=>{
+  if(modeV!=='orbit'||!active)return;e.preventDefault();
+  orb.dist=Math.max(300,Math.min(15000,orb.dist*(1+Math.sign(e.deltaY)*.12)));
+},{passive:false});
+function onResizeF(){if(!renderer||!active)return;
+  renderer.setSize(innerWidth,innerHeight);
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();}
+addEventListener('resize',onResizeF);
+
+// ---------------- LAUNCH ----------------
+window.launchFly=async function(run){
+  const ways=matchedWays(run);                  // from the planner script
+  if(!ways.length){alert('Trail lines are still loading (or unavailable offline) — try again in a moment.');return;}
+  curRun=run;
+  $('fly').style.display='block';
+  $('fly_loading').style.display='flex';$('fly_err').style.display='none';
+  $('fly_title').textContent='🏃 '+run.name;
+  $('fly_sub').textContent=run.dist+' · '+run.gain+' · '+run.type;
+  // default pace from the planner's pace box (min/mi -> mph)
+  const pmin=parseFloat(document.getElementById('pace').value)||11;
+  $('fly_speed').value=Math.max(1,Math.min(12,Math.round(60/pmin*2)/2));
+  playing=false;progress=0;ghostDist=0;recapShown=false;
+  $('fly_scrub').value=0;setPlayF(false);
+  try{
+    $('fly_loadmsg').textContent='Stitching trail line…';
+    await build(run,ways);
+  }catch(e){
+    $('fly_loadmsg').textContent='';
+    const er=$('fly_err');er.style.display='block';
+    er.textContent='⚠️ Could not build the 3D scene ('+e.message+'). Check your connection and try again.';
+    return;
+  }
+  $('fly_loading').style.display='none';
+  updateFinishF();
+  active=true;lastT=0;onResizeF();
+  rafId=requestAnimationFrame(animateF);
+};
+})();
+</script>
+</body>
+</html>
